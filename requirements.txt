@@ -4,7 +4,7 @@
 streamlit
 pandas
 numpy
-json
 matplotlib
 scipy
 reportlab
+
