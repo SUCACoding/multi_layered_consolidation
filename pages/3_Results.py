@@ -77,7 +77,7 @@ def calculate_consolidation_results(strat, load_vector, cons_degrees_percent):
 
     t_plot = np.maximum(t_step_sum, 1e-10)
 
-    df_log_settlement = pd.DataFrame({'Time [days]': t_plot[1:], 'Settlement [mm]': -sett[0, 1:]})
+    df_log_settlement = pd.DataFrame({'Time [days]': t_plot[1:], 'Settlement [mm]': sett[0, 1:]})
     avg_cons_deg = 1 - np.sum(UPore_Calc, axis=0) / np.sum(load_vector)
     avg_cons_deg = np.clip(avg_cons_deg, 1e-10, None)  # similarly clip
     df_log_cons_degree = pd.DataFrame({'Time [days]': t_plot[1:], 'Consolidation Degree [-]': avg_cons_deg[1:]})
@@ -105,37 +105,42 @@ def calculate_consolidation_results(strat, load_vector, cons_degrees_percent):
 def plot_from_df(df, x_label, y_label, title, invert_x=False, log_x=False, invert_y=False):
     fig, ax = plt.subplots()
 
-    # Convert Series to DataFrame for consistent handling
+    # Ensure df is DataFrame
     if isinstance(df, pd.Series):
         df = df.to_frame()
 
-    # Use DataFrame index as x-axis values
-    x_vals = df.index.to_numpy()
-
-    # Fix for zeros or negatives on log scale
-    if log_x:
-        # Replace zeros or negative x_vals with small positive number
-        x_vals = np.where(x_vals <= 0, 1e-10, x_vals)
-
     for col in df.columns:
-        y_vals = df[col].to_numpy()
+        if log_x:
+            # x is df.index (time), y is data column
+            x_vals = df.index.to_numpy()
+            y_vals = df[col].to_numpy()
+
+            # Filter out non-positive x values for log scale
+            mask = x_vals > 0
+            x_vals = x_vals[mask]
+            y_vals = y_vals[mask]
+        else:
+            # For other plots, x is data column, y is index (usually depth)
+            x_vals = df[col].to_numpy()
+            y_vals = df.index.to_numpy()
+
         if invert_y:
-            y_vals = -y_vals
+            #y_vals = -y_vals
             ax.invert_yaxis()
+
         ax.plot(x_vals, y_vals, label=str(col))
 
     ax.set_xlabel(x_label)
-    ax.set_ylabel('Depth [m]' if invert_y else y_label)
+    ax.set_ylabel(y_label)
     ax.set_title(title)
 
     if invert_x:
         ax.invert_xaxis()
+
     if log_x:
         ax.set_xscale('log')
-        ax.set_xlim(left=x_vals[x_vals > 0].min(), right=x_vals.max())
-
-    if invert_y:
-        ax.invert_yaxis()
+        if len(x_vals) > 0:
+            ax.set_xlim(left=np.min(x_vals), right=np.max(x_vals))
 
     ax.grid(True, which='both', linestyle='--', linewidth=0.5)
     ax.legend()
@@ -182,7 +187,7 @@ if 'results' in st.session_state:
         ("Consolidation Degree vs Depth", r['df_cons_degree'], 'Consolidation Degree [-]', 'Depth [m]', True, False, True),
         ("Settlement over Depth", r['df_settlement'], 'Settlement [mm]', 'Depth [m]', True, False, True),
         ("Time until Consolidation Degree", r['df_time_depth'], 'Time [Days]', 'Depth [m]', False, False, True),
-        ("Settlement vs Log Time", r['df_log_settlement'], 'Time [days]', 'Settlement [mm]', False, True, False),
+        ("Settlement vs Log Time", r['df_log_settlement'], 'Time [days]', 'Settlement [mm]', False, True, True),
         ("Consolidation Degree vs Log Time", r['df_log_cons_degree'], 'Time [days]', 'U [-]', False, True, False),
     ]
 
